@@ -104,11 +104,14 @@ Este repositório reúne anotações e conceitos fundamentais sobre alguns servi
 ---
 
 ## 📂 Estrutura do Repositório 
+```
 .
 ├── README.md          # Documentação principal (teoria)
 └── images/            # Diagramas ilustrativos
     ├── DesafioEBS.png
     └── DesafioS3.png
+
+```
     
 ---
 
