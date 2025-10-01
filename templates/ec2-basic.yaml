@@ -1,0 +1,9 @@
+Description: Template básico CloudFormation - EC2 + Security Group
+
+Resources:
+  EC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      AvailabilityZone: us-east-1a
+      InstanceType: t2.micro
+      ImageId: ami-0ed9277fb7eb570c9

@@ -115,7 +115,7 @@ Este repositório reúne anotações e conceitos fundamentais sobre alguns servi
 
 ---
 
-## AWS Step Functions
+## 🧩 AWS Step Functions
 
 ### O que são
 
@@ -153,315 +153,44 @@ A imagem abaixo mostra um exemplo de orquestração de processamento de pedidos:
 - Registro em tabelas do DynamoDB.
 - Geração de resumo final.
 
-### Exemplo mínimo de definição JSON de State Machine
+# 🏗️ AWS CloudFormation
 
-```json
-{
-  "Comment": "Distributed map that processes bulk order in JSON object format through StateInput using orderId as unique identifier",
-  "QueryLanguage": "JSONata",
-  "StartAt": "InjectSampleOrders",
-  "States": {
-    "InjectSampleOrders": {
-      "Type": "Pass",
-      "Assign": {
-        "BatchId": "batch-123",
-        "Metadata": {
-          "source": "test"
-        },
-        "PricingRules": {
-          "electronics": {
-            "multiplier": 1.2
-          },
-          "books": {
-            "multiplier": 1.1
-          }
-        },
-        "Orders": {
-          "order1": {
-            "Value": {
-              "orderId": "order1",
-              "customerId": "cust1",
-              "items": [
-                {
-                  "name": "Laptop",
-                  "category": "electronics",
-                  "price": 1000,
-                  "quantity": 1
-                }
-              ]
-            }
-          },
-          "order2": {
-            "Value": {
-              "orderId": "order2",
-              "customerId": "cust2",
-              "items": [
-                {
-                  "name": "Mouse",
-                  "category": "electronics",
-                  "price": 50,
-                  "quantity": 2
-                }
-              ]
-            }
-          },
-          "order3": {
-            "Value": {
-              "orderId": "order3",
-              "customerId": "cust3"
-            }
-          },
-          "order4": {
-            "Value": {
-              "orderId": "order4",
-              "customerId": "cust4",
-              "items": null
-            }
-          },
-          "order5": {
-            "Value": {
-              "orderId": "order5",
-              "customerId": "cust5",
-              "items": [
-                {
-                  "name": "Keyboard",
-                  "category": "electronics",
-                  "price": 80,
-                  "quantity": 1
-                }
-              ]
-            }
-          },
-          "order6": {
-            "Value": {
-              "orderId": "order6",
-              "customerId": "cust6",
-              "items": "not-an-array"
-            }
-          },
-          "order7": {
-            "Value": {
-              "orderId": "order7",
-              "customerId": "cust7",
-              "items": [
-                {
-                  "name": "Monitor",
-                  "category": "electronics",
-                  "price": 300,
-                  "quantity": 1
-                }
-              ]
-            }
-          },
-          "order8": {
-            "Value": {
-              "orderId": "order8",
-              "customerId": "cust8",
-              "items": [
-                {
-                  "name": "Chair",
-                  "category": "furniture",
-                  "price": 150,
-                  "quantity": 2
-                }
-              ]
-            }
-          },
-          "order9": {
-            "Value": {
-              "orderId": "order9",
-              "customerId": "cust9",
-              "items": [
-                {
-                  "name": "Desk",
-                  "category": "furniture",
-                  "price": 250,
-                  "quantity": 1
-                }
-              ]
-            }
-          },
-          "order10": {
-            "Value": {
-              "orderId": "order10",
-              "customerId": "cust10",
-              "items": [
-                {
-                  "name": "Headphones",
-                  "category": "electronics",
-                  "price": 100,
-                  "quantity": 1
-                }
-              ]
-            }
-          }
-        }
-      },
-      "Next": "ValidateBulkOrder"
-    },
-    "ValidateBulkOrder": {
-      "Type": "Task",
-      "Resource": "arn:aws:states:::lambda:invoke",
-      "Arguments": {
-        "FunctionName": "MyLambdaFunction",
-        "Payload": {
-          "batchId": "{% $BatchId %}",
-          "metadata": "{% $Metadata %}",
-          "pricingRules": "{% $PricingRules %}",
-          "Orders": "{% $Orders %}"
-        }
-      },
-      "Assign": {
-        "ValidationResult": "{% $states.result %}"
-      },
-      "Next": "ProcessOrders"
-    },
-    "ProcessOrders": {
-      "Type": "Map",
-      "Items": "{% $ValidationResult.Payload.Orders ~> $each(function($v, $k) { {'Key': $k, 'Value': $v.Value, 'BatchId': $BatchId, 'Metadata': $Metadata, 'PricingRules': $PricingRules} }) %}",
-      "ItemProcessor": {
-        "ProcessorConfig": {
-          "Mode": "DISTRIBUTED",
-          "ExecutionType": "STANDARD"
-        },
-        "StartAt": "InitializeVariables",
-        "States": {
-          "InitializeVariables": {
-            "Type": "Pass",
-            "Assign": {
-              "ItemBatchId": "{% $states.input.BatchId %}",
-              "ItemMetadata": "{% $states.input.Metadata %}",
-              "ItemPricingRules": "{% $states.input.PricingRules %}"
-            },
-            "Next": "CheckInventory"
-          },
-          "CheckInventory": {
-            "Type": "Task",
-            "Resource": "arn:aws:states:::lambda:invoke",
-            "Arguments": {
-              "FunctionName": "MyLambdaFunction",
-              "Payload": {
-                "order": "{% $states.input.Value %}",
-                "orderId": "{% $states.input.Key %}",
-                "metadata": "{% $ItemMetadata %}"
-              }
-            },
-            "Assign": {
-              "inventoryResult": "{% $states.result.Payload %}"
-            },
-            "Next": "ApplyPricingRules"
-          },
-          "ApplyPricingRules": {
-            "Type": "Task",
-            "Resource": "arn:aws:states:::lambda:invoke",
-            "Arguments": {
-              "FunctionName": "MyLambdaFunction",
-              "Payload": {
-                "order": "{% $inventoryResult.order %}",
-                "orderId": "{% $inventoryResult.orderId %}",
-                "pricingRules": "{% $ItemPricingRules %}",
-                "inventoryResult": "{% $inventoryResult.inventoryResult %}"
-              }
-            },
-            "Assign": {
-              "pricingResult": "{% $states.result.Payload %}"
-            },
-            "Next": "RouteOrder"
-          },
-          "RouteOrder": {
-            "Type": "Choice",
-            "Choices": [
-              {
-                "Condition": "{% $inventoryResult.inventoryResult.status = 'AVAILABLE' %}",
-                "Next": "ProcessValidOrder"
-              }
-            ],
-            "Default": "LogInventoryIssue"
-          },
-          "ProcessValidOrder": {
-            "Type": "Task",
-            "Resource": "arn:aws:states:::dynamodb:updateItem",
-            "Arguments": {
-              "TableName": "<DYNAMODB_TABLE_NAME>",
-              "Key": {
-                "OrderId": {
-                  "S": "{% $string($pricingResult.orderId) %}"
-                }
-              },
-              "UpdateExpression": "SET #status = :s, #price = :p",
-              "ExpressionAttributeNames": {
-                "#status": "Status",
-                "#price": "FinalPrice"
-              },
-              "ExpressionAttributeValues": {
-                ":s": {
-                  "S": "PROCESSING"
-                },
-                ":p": {
-                  "N": "{% $string($pricingResult.calculatedPrice.total) %}"
-                }
-              }
-            },
-            "End": true
-          },
-          "LogInventoryIssue": {
-            "Type": "Task",
-            "Resource": "arn:aws:states:::dynamodb:putItem",
-            "Arguments": {
-              "TableName": "<DYNAMODB_TABLE_NAME>",
-              "Item": {
-                "IssueId": {
-                  "S": "{% $ItemBatchId & '-' & $inventoryResult.orderId %}"
-                },
-                "BatchId": {
-                  "S": "{% $ItemBatchId %}"
-                },
-                "OrderId": {
-                  "S": "{% $inventoryResult.orderId %}"
-                },
-                "IssueType": {
-                  "S": "INVENTORY_SHORTAGE"
-                },
-                "Details": {
-                  "S": "{% $string($inventoryResult.inventoryResult) %}"
-                },
-                "Timestamp": {
-                  "S": "{% $states.context.State.EnteredTime %}"
-                },
-                "Status": {
-                  "S": "PENDING"
-                }
-              }
-            },
-            "End": true
-          }
-        }
-      },
-      "MaxConcurrency": 10,
-      "Next": "GenerateBatchSummary"
-    },
-    "GenerateBatchSummary": {
-      "Type": "Task",
-      "Resource": "arn:aws:states:::lambda:invoke",
-      "Arguments": {
-        "FunctionName": "MyLambdaFunction",
-        "Payload": {
-          "batchId": "{% $BatchId %}",
-          "metadata": "{% $Metadata %}",
-          "results": "{% $states.input %}"
-        }
-      },
-      "End": true
-    }
-  }
-}
-```
+## 📌 O que é o CloudFormation?
+
+O **AWS CloudFormation** é um serviço que permite implementar **Infraestrutura como Código (IaC)**.  
+Com ele, você descreve os recursos de nuvem (EC2, S3, VPCs, IAM, etc.) em **templates** no formato **YAML ou JSON**, e a AWS se encarrega de criar e gerenciar esses recursos de forma automatizada.
+
+---
+
+## 🎯 Vantagens do CloudFormation
+
+- **Automação**: elimina a criação manual de recursos.
+- **Reprodutibilidade**: o mesmo template pode ser usado em múltiplos ambientes (dev, teste, produção).
+- **Controle de mudanças**: suporta atualização de stacks e rollback automático em caso de falhas.
+- **Escalabilidade**: fácil replicação de arquiteturas completas.
+- **Padronização**: garante consistência no provisionamento da infraestrutura.
+
+---
+
+## 🔑 Conceitos-Chave
+
+- **Template**: arquivo YAML/JSON que descreve os recursos.
+- **Stack**: conjunto de recursos criados a partir de um template.
+- **Resources**: definição dos serviços AWS a serem provisionados.
+- **Parameters**: valores de entrada para tornar o template mais flexível.
+- **Outputs**: informações de saída (ex.: IP público da instância criada).
+- **Change Sets**: pré-visualização de alterações antes de aplicá-las na stack.
+
+---
 
 ## 📂 Estrutura do Repositório
 
 ```
 .
 ├── README.md          # Documentação principal (teoria)
+├── Cloudformation.md  # Documentação sobre criação de stack
+├── templates/         # Arquivos YAML/JSON de exemplo de templates.
+    └── ec2-basic.yaml
 └── images/            # Diagramas ilustrativos
     ├── DesafioEBS.png
     ├── DesafioS3.png
@@ -477,3 +206,4 @@ A imagem abaixo mostra um exemplo de orquestração de processamento de pedidos:
 - [AWS S3 Documentation](https://docs.aws.amazon.com/s3/)
 - [AWS EBS Documentation](https://docs.aws.amazon.com/ebs/)
 - [AWS Step Functions Documentation](https://docs.aws.amazon.com/step-functions/)
+- [AWS CloudFormation](https://docs.aws.amazon.com/cloudformation/)
